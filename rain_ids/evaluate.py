@@ -74,8 +74,10 @@ def _per_class_mean(arr, y, C):
 
 
 def full_report(model, arrays, meta, device, out_dir: Path, split="test", full=True,
-                tsne=False, amp_dtype=None, train_info=None):
-    """Compute every metric and figure for `split` and write them to out_dir."""
+                tsne=False, amp_dtype=None, train_info=None, task="both"):
+    """Compute every metric and figure for `split` and write them to out_dir.
+    task="binary": the multi-class head was not trained, so the "multiclass" section and the
+    per-class tables are computed on the two classes <normal> / Attack from the binary head."""
     out_dir.mkdir(parents=True, exist_ok=True)
     fig_dir = out_dir / "figures"
     names = meta["class_names"]
@@ -87,6 +89,9 @@ def full_report(model, arrays, meta, device, out_dir: Path, split="test", full=T
 
     pr = predict(model, x_num, x_cat, device, need_weights=full, amp_dtype=amp_dtype)
     prob, p_bin = pr["prob"], pr["p_bin"]
+    if task == "binary":
+        names, C, normal, y = [names[normal], "Attack"], 2, 0, y_bin
+        prob = np.stack([1 - p_bin, p_bin], 1)
     p_attack_from_multi = 1.0 - prob[:, normal]
 
     mc, per_class, cm = Mx.multiclass_metrics(y, prob, names)

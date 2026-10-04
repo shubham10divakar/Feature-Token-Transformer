@@ -56,6 +56,7 @@ python benchmark.py                                  # ceiling, XGBoost (plain +
 python benchmark.py --datasets unsw_official --models ceiling xgboost mlp
 python benchmark.py --tag dedup -- --dedup_test      # a second protocol; args after -- go to every run
 python benchmark.py --tag trainonly -- --train_file_only   # random split of the train file only
+python benchmark.py --tag binary --models xgboost mlp rain -- --task binary   # normal vs attack only
 python benchmark.py --summary_only                   # rebuild runs/bench/summary.csv
 python train.py --dataset nslkdd --model mlp         # MLP alone (--mlp_hidden, --mlp_layers, --mlp_dropout)
 python data_check.py --dataset unsw_official         # ceiling alone
@@ -75,7 +76,7 @@ python train.py --dataset unsw_official --eval_only             # regenerate the
 - **Saved every epoch:** `checkpoints/epoch_XXX.pt`, plus `last.pt` and `best.pt` when the monitored metric improves. Each holds the model, optimizer, LR scheduler, AMP scaler, early-stopping state, history and every RNG state, so a resumed run continues exactly where it stopped. `--keep_epochs N` keeps only the newest N epoch files, and `--no_save_every_epoch` keeps only `last.pt` and `best.pt`. Writes are atomic, so a crash never corrupts the previous checkpoint. Pressing Ctrl-C also leaves `last.pt` resumable.
 - **Resume:** the run directory is `runs/<run_name>`. By default the name is built from the dataset, model, d, K, embedding and seed, so rerunning the same command with `--resume` finds the run. Data and model settings always come from the checkpoint, and the training settings (epochs, patience) come from the command line.
 - **Early stopping:** `--patience 15` (0 turns it off), `--min_delta`, and `--monitor val_macro_f1 | val_loss | val_bin_f1 | val_acc`.
-- **Other training options:** `--task both|multi|binary` (with `--lambda_bin`), `--embedding periodic`, `--class_weight`, `--label_smoothing`, `--grad_checkpoint` (for K ≥ 6), `--no_amp`, and `--deterministic`.
+- **Other training options:** `--task both|multi|binary` (with `--lambda_bin`; with `binary` the report's multi-class section and per-class tables cover the two classes normal / Attack, and XGBoost trains a binary model), `--embedding periodic`, `--class_weight`, `--label_smoothing`, `--grad_checkpoint` (for K ≥ 6), `--no_amp`, and `--deterministic`.
 - **LR schedule:** warmup followed by cosine decay over `--epochs`. If you change `--epochs` on resume, the rest of the schedule is stretched to the new length.
 
 ## End-of-run report (`--report full`, the default)

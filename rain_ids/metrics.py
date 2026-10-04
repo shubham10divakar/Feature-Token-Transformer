@@ -45,6 +45,9 @@ def multiclass_metrics(y, prob, class_names):
         out["roc_auc_ovr_macro"] = _safe(M.roc_auc_score, y, pr, multi_class="ovr", average="macro", labels=present)
         out["roc_auc_ovr_weighted"] = _safe(M.roc_auc_score, y, pr, multi_class="ovr", average="weighted", labels=present)
         out["roc_auc_ovo_macro"] = _safe(M.roc_auc_score, y, pr, multi_class="ovo", average="macro", labels=present)
+    elif len(present) == 2:              # binary task: OvR / OvO AUC is the ordinary AUC
+        auc = _safe(M.roc_auc_score, y == present[1], pr[:, 1])
+        out["roc_auc_ovr_macro"] = out["roc_auc_ovr_weighted"] = out["roc_auc_ovo_macro"] = auc
     out["pr_auc_macro"] = _safe(M.average_precision_score, y_onehot[:, present], prob[:, present], average="macro")
     out["pr_auc_micro"] = _safe(M.average_precision_score, y_onehot[:, present], prob[:, present], average="micro")
 

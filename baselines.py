@@ -2,6 +2,7 @@
 
   python baselines.py --dataset unsw_official
   python baselines.py --dataset unsw_official --xgb_balance 1    # balanced sample weights
+  python baselines.py --dataset unsw_official --task binary      # normal vs attack only
 Any data argument of train.py (e.g. --drop_leaky, --cic_label, --dedup_test) is accepted.
 XGBoost options: --n_estimators, --max_depth, --xgb_lr, --xgb_balance (0/1).
 MLP baseline: python train.py --model mlp --dataset ...
@@ -39,6 +40,10 @@ def main():
     log = setup_logging(run_dir)
     arrays, meta, _, _ = prepare_data(args)
     names, normal = meta["class_names"], meta["normal_idx"]
+    if args.task == "binary":            # train and report <normal> vs Attack only
+        for sp in ("train", "val", "test"):
+            arrays[f"{sp}_y"] = (arrays[f"{sp}_y"] != normal).astype(np.int64)
+        names, normal = [names[normal], "Attack"], 0
 
     def X(s):
         return np.concatenate([arrays[f"{s}_num"], arrays[f"{s}_cat"].astype(np.float32)], 1)
@@ -46,7 +51,8 @@ def main():
     clf = xgb.XGBClassifier(n_estimators=xgb_cfg["--n_estimators"], max_depth=xgb_cfg["--max_depth"],
                             learning_rate=xgb_cfg["--xgb_lr"], subsample=0.8, colsample_bytree=0.8,
                             tree_method="hist", device="cuda" if args.device.startswith("cuda") else "cpu",
-                            early_stopping_rounds=50, eval_metric="mlogloss", random_state=args.seed)
+                            early_stopping_rounds=50, random_state=args.seed,
+                            eval_metric="logloss" if args.task == "binary" else "mlogloss")
     sw = None
     if xgb_cfg["--xgb_balance"]:
         cnt = np.bincount(arrays["train_y"], minlength=len(names)).astype(float)

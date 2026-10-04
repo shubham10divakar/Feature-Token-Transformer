@@ -362,8 +362,9 @@ def main(argv=None):
             "monitor": args.monitor}
     full = args.report == "full"
     full_report(model, arrays, meta, device, run_dir / "report", "test", full=full, tsne=args.tsne,
-                amp_dtype=None, train_info=info)
-    full_report(model, arrays, meta, device, run_dir / "report" / "val", "val", full=False, amp_dtype=None)
+                amp_dtype=None, train_info=info, task=args.task)
+    full_report(model, arrays, meta, device, run_dir / "report" / "val", "val", full=False, amp_dtype=None,
+                task=args.task)
     log.info(f"done. run directory: {run_dir.resolve()}")
 
 
