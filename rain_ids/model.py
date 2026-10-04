@@ -224,11 +224,35 @@ class FTTransformer(nn.Module):
         return out
 
 
+class MLP(nn.Module):
+    """Baseline: numeric features + small categorical embeddings -> L x (Linear, BN, ReLU, Dropout)."""
+
+    def __init__(self, n_num, cat_cards, n_classes, hidden=256, layers=3, dropout=0.1, **_):
+        super().__init__()
+        self.cat = nn.ModuleList(nn.Embedding(c, min(16, (c + 1) // 2 + 1)) for c in cat_cards)
+        width = n_num + sum(e.embedding_dim for e in self.cat)
+        blocks = []
+        for _ in range(layers):
+            blocks += [nn.Linear(width, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Dropout(dropout)]
+            width = hidden
+        self.body = nn.Sequential(*blocks)
+        self.head_multi = nn.Linear(hidden, n_classes)
+        self.head_bin = nn.Linear(hidden, 1)
+
+    def forward(self, x_num, x_cat, need_weights=False):
+        parts = [x_num] + [e(x_cat[:, j]) for j, e in enumerate(self.cat)]
+        z = self.body(torch.cat(parts, 1))
+        return {"logits": self.head_multi(z), "logit_bin": self.head_bin(z).squeeze(-1), "embedding": z}
+
+
 MODEL_KEYS = ["model", "d", "K", "heads", "embedding", "ffn", "ffn_mult", "attn_dropout",
-              "ffn_dropout", "residual_dropout", "gate_bias"]
+              "ffn_dropout", "residual_dropout", "gate_bias", "mlp_hidden", "mlp_layers", "mlp_dropout"]
 
 
 def build_model(args, meta):
+    if args.model == "mlp":
+        return MLP(meta["n_num"], meta["cat_cardinalities"], len(meta["class_names"]),
+                   hidden=args.mlp_hidden, layers=args.mlp_layers, dropout=args.mlp_dropout)
     cls = {"rain": RAINIDS, "ft_transformer": FTTransformer}[args.model]
     return cls(meta["n_num"], meta["cat_cardinalities"], len(meta["class_names"]),
                d=args.d, K=args.K, heads=args.heads, embedding=args.embedding, ffn=args.ffn,

@@ -20,7 +20,7 @@ log = logging.getLogger("rain")
 # arguments that change the processed data (anything else can vary across runs)
 DATA_KEYS = ["dataset", "data_root", "cic_label", "nsl_test", "drop_leaky", "dedup_test",
              "test_size", "val_size", "split_seed", "undersample", "smote_target",
-             "no_rebalance", "rare_min", "max_train_rows"]
+             "no_rebalance", "rare_min", "max_train_rows", "train_file_only"]
 
 
 def parse_undersample(s, default):
@@ -67,6 +67,9 @@ def _load_raw(args):
             # the published UNSW-NB15 "training"/"testing" files are swapped (175k train / 82k test)
             log.warning(f"swapped-file check: train has {len(tr):,} rows < test {len(te):,}; swapping")
             tr, te = te, tr
+        if getattr(args, "train_file_only", False):
+            log.info("--train_file_only: ignoring the official test file; test is a random split of train")
+            te = None
     else:
         tr, te = _load(root, spec.file), None
 
@@ -91,6 +94,8 @@ def prepare_data(args, cache_root="cache"):
     spec = DATASETS[args.dataset]
     cfg = {k: getattr(args, k, None) for k in DATA_KEYS}
     cfg["data_root"] = str(Path(cfg["data_root"]).resolve())
+    if not cfg["train_file_only"]:      # keep cache hashes from before this option existed
+        del cfg["train_file_only"]
     h = hashlib.md5(json.dumps(cfg, sort_keys=True).encode()).hexdigest()[:10]
     cdir = Path(cache_root) / f"{args.dataset}_{h}"
     if (cdir / "arrays.npz").exists() and not getattr(args, "rebuild_cache", False):
@@ -104,7 +109,7 @@ def prepare_data(args, cache_root="cache"):
     feats = [c for c in tr.columns if c != "__y"]
 
     # 3. deduplicate on X + y before splitting
-    if spec.split == "random":
+    if te is None:                       # single file (or --train_file_only): stratified random test split
         df = _dedup(tr, feats + ["__y"], "full set")
         tr, te = train_test_split(df, test_size=args.test_size, stratify=df["__y"],
                                   random_state=args.split_seed)

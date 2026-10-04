@@ -16,6 +16,8 @@ rain_ids/
 train.py         train / resume / evaluate
 baselines.py     XGBoost on the identical processed data
 ablation.py      K sweep (K = 1 vs K > 1) across seeds
+data_check.py    label-noise ceiling: best accuracy / macro-F1 any model can reach on the split
+benchmark.py     every model x every dataset on identical data, one summary table
 ```
 
 ## Setup
@@ -40,10 +42,24 @@ If you run `python train.py` without `--dataset`, it shows an interactive menu.
 Useful data options:
 - `--drop_leaky`: drops the UNSW TTL leakage features (`sttl`, `dttl`, `ct_state_ttl`).
 - `--dedup_test`: deduplicates the official test file as well.
+- `--train_file_only`: ignores the official test file (UNSW official, NSL-KDD). The train file is split at random into train/val/test (`--test_size`, `--val_size`), and every report uses that held-out test part. The other datasets are single files and already split this way.
 - `--undersample "Normal=80000,Generic=30000"` or `none`: sets the class caps.
 - `--smote_target 2000` (0 turns SMOTE off) and `--no_rebalance`.
 
 The processed data is cached under `cache/<dataset>_<hash>/`, together with `preproc.pkl` (the fitted transformers, vocabularies and column order). Any run with the same data settings reuses it. `--rebuild_cache` forces a rebuild.
+
+## Baselines and benchmark
+
+```powershell
+python benchmark.py                                  # ceiling, XGBoost (plain + balanced), MLP, FT-Transformer,
+                                                     #   RAIN K=1, RAIN K=4 on all four datasets
+python benchmark.py --datasets unsw_official --models ceiling xgboost mlp
+python benchmark.py --tag dedup -- --dedup_test      # a second protocol; args after -- go to every run
+python benchmark.py --tag trainonly -- --train_file_only   # random split of the train file only
+python benchmark.py --summary_only                   # rebuild runs/bench/summary.csv
+python train.py --dataset nslkdd --model mlp         # MLP alone (--mlp_hidden, --mlp_layers, --mlp_dropout)
+python data_check.py --dataset unsw_official         # ceiling alone
+```
 
 ## Training, checkpoints, resuming, early stopping
 

@@ -5,6 +5,7 @@ Examples
   python train.py --dataset unsw_official --resume                 # continue from last.pt
   python train.py --dataset unsw_official --resume_from runs/<run>/checkpoints/epoch_012.pt
   python train.py --dataset nslkdd --model ft_transformer --K 3
+  python train.py --dataset nslkdd --model mlp --mlp_hidden 256 --mlp_layers 3
   python train.py --dataset cicids2017 --eval_only                 # re-make report from best.pt
   python train.py                                                  # interactive dataset menu
 """
@@ -40,7 +41,10 @@ def get_args(argv=None):
     g.add_argument("--nsl_test", choices=["plus", "21"], default="plus", help="NSL-KDD: KDDTest+ or KDDTest-21")
     g.add_argument("--drop_leaky", action="store_true", help="UNSW: drop sttl, dttl, ct_state_ttl")
     g.add_argument("--dedup_test", action="store_true", help="official splits: also deduplicate the test file")
-    g.add_argument("--test_size", type=float, default=0.2, help="random-split datasets only")
+    g.add_argument("--train_file_only", action="store_true",
+                   help="official splits: ignore the test file; split the train file into train/val/test "
+                        "(stratified, --test_size / --val_size)")
+    g.add_argument("--test_size", type=float, default=0.2, help="random-split datasets and --train_file_only")
     g.add_argument("--val_size", type=float, default=0.1)
     g.add_argument("--split_seed", type=int, default=42)
     g.add_argument("--undersample", default=None,
@@ -52,7 +56,7 @@ def get_args(argv=None):
     g.add_argument("--rebuild_cache", action="store_true")
 
     g = p.add_argument_group("model")
-    g.add_argument("--model", choices=["rain", "ft_transformer"], default="rain")
+    g.add_argument("--model", choices=["rain", "ft_transformer", "mlp"], default="rain")
     g.add_argument("--d", type=int, default=64)
     g.add_argument("--K", type=int, default=4, help="recursion steps (rain) / layers (ft_transformer)")
     g.add_argument("--heads", type=int, default=4)
@@ -64,6 +68,9 @@ def get_args(argv=None):
     g.add_argument("--residual_dropout", type=float, default=0.0)
     g.add_argument("--gate_bias", type=float, default=-2.0)
     g.add_argument("--grad_checkpoint", action="store_true", help="per-iteration checkpointing (large K)")
+    g.add_argument("--mlp_hidden", type=int, default=256, help="mlp: hidden width")
+    g.add_argument("--mlp_layers", type=int, default=3, help="mlp: hidden layers")
+    g.add_argument("--mlp_dropout", type=float, default=0.1, help="mlp: dropout")
 
     g = p.add_argument_group("training")
     g.add_argument("--task", choices=["both", "multi", "binary"], default="both",
@@ -112,7 +119,13 @@ def get_args(argv=None):
         extra = "_leaky-dropped" if args.drop_leaky else ""
         extra += f"_{args.cic_label}" if args.dataset == "cicids2017" else ""
         extra += "_test21" if args.dataset == "nslkdd" and args.nsl_test == "21" else ""
-        args.run_name = f"{args.dataset}{extra}_{args.model}_d{args.d}_K{args.K}_{args.embedding}_s{args.seed}"
+        extra += "_dedup-test" if args.dedup_test else ""
+        extra += "_trainonly" if args.train_file_only else ""
+        if args.model == "mlp":
+            arch = f"h{args.mlp_hidden}_L{args.mlp_layers}"
+        else:
+            arch = f"d{args.d}_K{args.K}_{args.embedding}"
+        args.run_name = f"{args.dataset}{extra}_{args.model}_{arch}_s{args.seed}"
     return args
 
 
